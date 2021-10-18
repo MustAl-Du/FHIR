@@ -1,0 +1,212 @@
+
+####################### STEP 0 ################################
+#### Create Variables, Tokens and Establish Connectivity ######
+###############################################################
+
+### REST Client Variables
+@fhirurl =https://?????????.azurehealthcareapis.com/
+@clientid =????????????????????????
+@clientsecret =????????????????????????
+@tenantid =????????????????????????
+
+### Get Metadata
+Get {{fhirurl}}metadata
+
+### Get access token 
+# @name getAADToken 
+POST https://login.microsoftonline.com/{{tenantid}}/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&resource={{fhirurl}}
+&client_id={{clientid}}
+&client_secret={{clientsecret}}
+
+### Extract access token from getAADToken request
+@token = {{getAADToken.response.body.access_token}}
+
+### GET Organization Count
+GET {{fhirurl}}/Organization?_summary=count
+Authorization: Bearer {{token}}
+
+
+
+
+####################### STEP 1 ################################
+### will create three Orgs; one parent and two child Orgs  ####
+### Local Health Authority LHA is the parnet Org, DPH and  ####
+### DMH are two child Orgs of LHA                          ####
+###############################################################
+### Create LHA Org
+POST {{fhirurl}}/Organization
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "resourceType": "organization",
+    "active": true,
+    "name": "LHA",
+    "alias": "Local Health Authority"   
+}
+### Set LHA UUID
+@lhauuid =????????????????????????
+
+### Create DPH Org
+POST {{fhirurl}}/Organization
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "resourceType": "organization",
+    "active": true,
+    "name": "DPH",
+    "alias": "Department of Public Health",  
+    "partOf": [
+    {
+      "reference": "Organization/{{lhauuid}}"
+    } 
+    ]
+}
+### Set DPH UUID
+@dphuuid =????????????????????????
+
+### Create DMH Org
+POST {{fhirurl}}/Organization
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "resourceType": "organization",
+    "active": true,
+    "name": "DMH",
+    "alias": "Department of Mental Health",  
+    "partOf": [
+    {
+      "reference": "Organization/{{lhauuid}}"
+    } 
+    ]
+}
+### Set DMH UUID
+@dmhuuid =????????????????????????
+
+### GET all three Organization
+GET {{fhirurl}}/Organization
+Authorization: Bearer {{token}}
+
+
+
+####################### STEP 2 ##########################
+### will create two patietns; one in each Org        ####
+#########################################################
+
+### Create DPH Patient
+POST {{fhirurl}}/Patient
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "resourceType": "Patient",
+    "active": true,
+    "name": [
+        {
+            "use": "official",
+            "family": "Bond",
+            "given": [
+                "James",
+                "DPH"
+            ]
+        },
+        {
+            "use": "usual",
+            "given": [
+                "James"
+            ]
+        }
+    ],
+    "gender": "male",
+    "birthDate": "1950-01-26",
+    "managingOrganization": [
+    {
+      "reference": "Organization/{{dphuuid}}"
+    }
+  ]
+}
+
+### Create DMH Patient
+POST {{fhirurl}}/Patient
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "resourceType": "Patient",
+    "active": true,
+    "name": [
+        {
+            "use": "official",
+            "family": "Hart",
+            "given": [
+                "Kevin",
+                "DMH"
+            ]
+        },
+        {
+            "use": "usual",
+            "given": [
+                "Kevin"
+            ]
+        }
+    ],
+    "gender": "male",
+    "birthDate": "1970-07-26",
+    "managingOrganization": [
+    {
+      "reference": "Organization/{{dmhuuid}}"
+    }
+  ]
+}
+
+
+### GET All Patients 
+GET {{fhirurl}}/Patient
+Authorization: Bearer {{token}}
+
+### Check Search Parameter for Patient: https://www.hl7.org/fhir/patient.html#search
+### It's 'organization' for 'Patient.manageingOrganziation'
+
+### GET Patient in DPH Org
+GET {{fhirurl}}/Patient?organization.name=DPH
+Authorization: Bearer {{token}}
+
+### GET Patient in DMH Org
+GET {{fhirurl}}/Patient?organization.name=DMH
+Authorization: Bearer {{token}}
+
+
+
+####################### STEP 3 ##########################
+### Clean up - Delete all Orgs and Patients          ####
+#########################################################
+### DELETE all male Patient
+Delete {{fhirurl}}/Patient?gender=male&_count=100
+Authorization: Bearer {{token}}
+
+### DELETE LHA Org
+Delete {{fhirurl}}/Organization/{{lhauuid}}
+Authorization: Bearer {{token}}
+
+### DELETE DPH Org
+Delete {{fhirurl}}/Organization/{{dphuuid}}
+Authorization: Bearer {{token}}
+
+### DELETE DMH Org
+Delete {{fhirurl}}/Organization/{{dmhuuid}}
+Authorization: Bearer {{token}}
+
+
+### GET All Patients 
+GET {{fhirurl}}/Patient
+Authorization: Bearer {{token}}
+
+### GET all three Organization
+GET {{fhirurl}}/Organization
+Authorization: Bearer {{token}}
